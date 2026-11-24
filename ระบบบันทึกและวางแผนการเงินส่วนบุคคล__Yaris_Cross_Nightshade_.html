@@ -1,0 +1,1939 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ระบบบันทึกและวางแผนการเงินส่วนบุคคล — รอบวันที่ 10</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* ใช้ฟอนต์ระบบที่อ่านง่ายและรองรับภาษาไทยชัดเจนโดยไม่ต้องพึ่งพาเครือข่ายภายนอก */
+    body {
+      font-family: "Noto Sans Thai", "Sarabun", "Prompt", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background-color: #f1f5f9;
+      color: #0f172a;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* ปรับแต่งแถบเลื่อน (Range Slider) ให้ใช้งานง่ายทั้งเมาส์และทัชสกรีน */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 7px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #2563eb;
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+      cursor: pointer;
+      transition: transform 0.12s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.12);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #2563eb;
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+      cursor: pointer;
+    }
+
+    /* ซ่อนลูกศรในช่องตัวเลขเพื่อความสะอาดและเรียบร้อย */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-14">
+
+  <!-- ส่วนหัวของแอปพลิเคชัน -->
+  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-lg font-bold shadow-sm shrink-0">
+          YC
+        </div>
+        <div>
+          <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white">
+            ระบบบันทึกและวางแผนการเงินส่วนบุคคล — รอบวันที่ 10
+          </h1>
+          <p class="text-xs sm:text-sm text-slate-300">
+            Toyota Yaris Cross Nightshade (เป้าปิดบอลลูน 278,700 บาท) • กองทุน DCA • เงินสำรองฉุกเฉิน & กยศ.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span id="storage-status-badge"
+          class="px-3 py-1.5 rounded-xl bg-emerald-950/90 text-emerald-300 border border-emerald-700/70 text-[11px] sm:text-xs font-semibold flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+          บันทึกอัตโนมัติในเบราว์เซอร์นี้แล้ว — ข้อมูลอยู่ครบแม้ปิดแล้วเปิดใหม่
+        </span>
+        <button id="btn-export-json" type="button"
+          class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-semibold transition cursor-pointer shadow-xs">
+          ส่งออก JSON (สำรองข้อมูล)
+        </button>
+        <button id="btn-import-json" type="button"
+          class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600 text-xs sm:text-sm font-semibold transition cursor-pointer">
+          นำเข้า JSON (กู้คืน)
+        </button>
+        <input id="input-import-json" type="file" accept="application/json,.json" class="hidden" />
+        <button id="btn-export-csv" type="button"
+          class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold transition cursor-pointer shadow-xs">
+          ส่งออก CSV
+        </button>
+        <button id="btn-reset-data" type="button"
+          class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-200 hover:text-rose-200 border border-slate-700 text-xs sm:text-sm font-semibold transition cursor-pointer">
+          รีเซ็ตกลับค่าเริ่มต้น
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- กล่องยืนยันการรีเซ็ตข้อมูล (แทนการใช้ confirm() ของเบราว์เซอร์) -->
+  <div id="reset-confirm-bar" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3">
+    <div class="rounded-2xl bg-rose-50 border border-rose-300 px-4 py-3 text-xs sm:text-sm text-rose-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs">
+      <span class="font-semibold">
+        ยืนยันการรีเซ็ตข้อมูลทั้งหมดกลับเป็นค่าเริ่มต้น (10 ธ.ค. 2569)? แนะนำให้ "ส่งออก JSON" สำรองไว้ก่อนหากมีข้อมูลสำคัญครับ
+      </span>
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="btn-confirm-reset" type="button"
+          class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition cursor-pointer">
+          ยืนยันรีเซ็ต
+        </button>
+        <button id="btn-cancel-reset" type="button"
+          class="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold text-xs transition cursor-pointer">
+          ยกเลิก
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- แบนเนอร์แจ้งสถานะการบันทึก / ข้อความเตือน -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3">
+          <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+            <div id="kpi-balloon-bar" class="h-full bg-blue-600 rounded-full transition-all duration-300" style="width: 1.69%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- การ์ด 2: เงินต้น DCA สะสม -->
+      <div class="bg-white rounded-2xl p-5 shadow-xs border border-slate-200 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
+              เงินต้น DCA สะสมรวม
+            </span>
+            <span id="kpi-record-badge" class="text-xs font-semibold text-slate-500">1 รอบบันทึก</span>
+          </div>
+          <div id="kpi-dca-total" class="mt-3 text-2xl sm:text-3xl font-bold text-slate-900">
+            ฿6,500
+          </div>
+        </div>
+        <div id="kpi-dca-sub" class="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-600 flex justify-between">
+          <span>เฉลี่ยต่องวด:</span>
+          <strong class="text-emerald-700">฿6,500</strong>
+        </div>
+      </div>
+
+      <!-- การ์ด 3: เงินสำรองฉุกเฉิน & สำรอง กยศ. สะสม -->
+      <div class="bg-white rounded-2xl p-5 shadow-xs border border-slate-200 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg">
+              สำรองฉุกเฉิน & สำรอง กยศ.
+            </span>
+            <span class="text-xs font-semibold text-slate-400">ยอดสะสม</span>
+          </div>
+          <div id="kpi-emergency-total" class="mt-3 text-2xl sm:text-3xl font-bold text-slate-900">
+            ฿4,500
+          </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-600 flex justify-between">
+          <span>สำรองจ่าย กยศ. สะสม:</span>
+          <strong id="kpi-korsor-total" class="text-purple-700">฿1,250</strong>
+        </div>
+      </div>
+
+      <!-- การ์ด 4: เงินเหลือสุทธิงวดล่าสุด & ส่วนต่างเทียบงวดก่อน -->
+      <div class="bg-white rounded-2xl p-5 shadow-xs border border-slate-200 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg">
+              เงินเหลือสุทธิงวดล่าสุด
+            </span>
+            <span id="kpi-latest-date" class="text-xs font-semibold text-slate-500">10 ธ.ค. 2569</span>
+          </div>
+          <div id="kpi-latest-surplus" class="mt-3 text-2xl sm:text-3xl font-bold text-slate-900">
+            ฿15,700
+          </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-100 text-xs flex items-center justify-between">
+          <span class="text-slate-500">เทียบงวดก่อนหน้า:</span>
+          <span id="kpi-diff-badge" class="font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+            งวดตั้งต้น
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- พื้นที่หลัก: ซ้าย (ฟอร์มปรับค่า + ปุ่ม Submit) | ขวา (กราฟวงกลม + กราฟรายเดือน/1–8 ปี) -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- คอลัมน์ซ้าย: ฟอร์มบันทึกและแถบเลื่อน -->
+      <div class="lg:col-span-5 bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+        <div class="bg-slate-900 text-white px-5 py-4">
+          <h2 class="text-base sm:text-lg font-bold">ตั้งค่าตัวเลขรอบเดือนและกดบันทึก</h2>
+          <p class="text-xs text-slate-300 mt-0.5">
+            เลือกวันที่จากปฏิทิน เลื่อนแถบหรือพิมพ์ตัวเลขทั้ง 4 หมวด แล้วกดปุ่มบันทึกด้านล่าง
+          </p>
+        </div>
+
+        <form id="finance-form" class="p-5 space-y-4">
+          <!-- วันที่ (ปฏิทิน + ปุ่มทางลัด) -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <label for="input-date" class="text-xs font-bold text-slate-700">
+                วันที่ / รอบเดือนที่บันทึก
+              </label>
+              <span id="thai-date-badge" class="text-xs font-bold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-lg">
+                10 ธ.ค. 2569
+              </span>
+            </div>
+
+            <input id="input-date" type="date" value="2026-12-10"
+              class="w-full px-3 py-2 text-sm font-semibold bg-white border border-slate-300 rounded-xl text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer" />
+
+            <div class="grid grid-cols-3 gap-1.5 pt-0.5">
+              <button id="btn-date-current-10" type="button"
+                class="py-1.5 px-2 rounded-lg bg-white hover:bg-blue-50 text-[11px] font-semibold text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-300 transition cursor-pointer">
+                วันที่ 10 เดือนนี้
+              </button>
+              <button id="btn-date-next-10" type="button"
+                class="py-1.5 px-2 rounded-lg bg-white hover:bg-blue-50 text-[11px] font-semibold text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-300 transition cursor-pointer">
+                วันที่ 10 เดือนถัดไป
+              </button>
+              <button id="btn-date-init-10" type="button"
+                class="py-1.5 px-2 rounded-lg bg-white hover:bg-blue-50 text-[11px] font-semibold text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-300 transition cursor-pointer">
+                ตั้งต้น 10 ธ.ค. 69
+              </button>
+            </div>
+          </div>
+
+          <!-- รายรับรวมประจำเดือน -->
+          <div class="p-3.5 rounded-xl bg-blue-50/50 border border-blue-100 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <label for="num-income" class="text-xs font-bold text-blue-950">
+                รายรับรวมประจำเดือน (บาท)
+              </label>
+              <input id="num-income" type="number" value="39000" min="0" max="500000" step="100"
+                class="w-28 px-2.5 py-1 text-right text-sm font-bold text-blue-700 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <input id="slider-income" type="range" value="39000" min="15000" max="80000" step="500" />
+          </div>
+
+          <!-- หมวด 1: ภาระประจำ ค่ารถและเงินสำรองประกันบวกเช็คระยะ -->
+          <div class="p-3.5 rounded-xl bg-white border border-slate-200 space-y-3">
+            <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+              <span class="text-xs font-bold text-slate-900 flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-[#2563eb] inline-block"></span>
+                1. ภาระประจำ ค่ารถและสำรองประกัน/เช็กระยะ
+              </span>
+              <span id="subtotal-cat1" class="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                ฿10,550
+              </span>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between text-xs mb-1">
+                <label for="num-car-installment" class="text-slate-600 font-medium">ค่างวดรถ</label>
+                <input id="num-car-installment" type="number" value="8300" min="0" max="100000" step="100"
+                  class="w-24 px-2 py-0.5 text-right text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg" />
+              </div>
+              <input id="slider-car-installment" type="range" value="8300" min="0" max="20000" step="100" />
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between text-xs mb-1">
+                <label for="num-car-reserve" class="text-slate-600 font-medium">เงินสำรองประกันและเช็กระยะ</label>
+                <input id="num-car-reserve" type="number" value="2250" min="0" max="100000" step="50"
+                  class="w-24 px-2 py-0.5 text-right text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg" />
+              </div>
+              <input id="slider-car-reserve" type="range" value="2250" min="0" max="8000" step="50" />
+            </div>
+          </div>
+
+          <!-- หมวด 2: ค่าน้ำมัน -->
+          <div class="p-3.5 rounded-xl bg-white border border-slate-200 space-y-2.5">
+            <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+              <span class="text-xs font-bold text-slate-900 flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-[#0d9488] inline-block"></span>
+                2. ค่าน้ำมัน
+              </span>
+              <span id="subtotal-cat2" class="text-xs font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md">
+                ฿2,250
+              </span>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between text-xs mb-1">
+                <label for="num-fuel" class="text-slate-600 font-medium">ค่าน้ำมันเชื้อเพลิง</label>
+                <input id="num-fuel" type="number" value="2250" min="0" max="100000" step="50"
+                  class="w-24 px-2 py-0.5 text-right text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg" />
+              </div>
+              <input id="slider-fuel" type="range" value="2250" min="0" max="10000" step="50" />
+            </div>
+          </div>
+
+          <!-- หมวด 3: ค่าที่พัก ค่ากินและค่าใช้จ่าย -->
+          <div class="p-3.5 rounded-xl bg-white border border-slate-200 space-y-3">
+            <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+              <span class="text-xs font-bold text-slate-900 flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-[#f59e0b] inline-block"></span>
+                3. ค่าที่พัก ค่ากินและค่าใช้จ่าย
+              </span>
+              <span id="subtotal-cat3" class="text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md">
+                ฿7,250
+              </span>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between text-xs mb-1">
+                <label for="num-rent" class="text-slate-600 font-medium">ค่าเช่าบ้าน</label>
+                <input id="num-rent" type="number" value="4250" min="0" max="100000" step="50"
+                  class="w-24 px-2 py-0.5 text-right text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg" />
+              </div>
+              <input id="slider-rent" type="range" value="4250" min="0" max="15000" step="50" />
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between text-xs mb-1">
+                <label for="num-food" class="text-slate-600 font-medium">ค่ากินอยู่จ่ายเอง</label>
+                <input id="num-food" type="number" value="1500" min="0" max="100000" step="50"
+                  class="w-24 px-2 py-0.5 text-right text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg" />
+              </div>
+              <input id="slider-food" type="range" value="1500" min="0" max="10000" step="50" />
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between text-xs mb-1">
+                <label for="num-general" class="text-slate-600 font-medium">ค่าใช้จ่ายอื่นๆ ทั่วไป</label>
+                <input id="num-general" type="number" value="1500" min="0" max="100000" step="50"
+                  class="w-24 px-2 py-0.5 text-right text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg" />
+              </div>
+              <input id="slider-general" type="range" value="1500" min="0" max="10000" step="50" />
+            </div>
+          </div>
+
+          <!-- หมวด 4: ภาระหนี้บัตรเครดิตและสำรองจ่าย กยศ. -->
+          <div class="p-3.5 rounded-xl bg-white border border-slate-200 space-y-3">
+            <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+              <span class="text-xs font-bold text-slate-900 flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-[#7c3aed] inline-block"></span>
+                4. ภาระหนี้บัตรเครดิตและสำรองจ่าย กยศ.
+              </span>
+              <span id="subtotal-cat4" class="text-xs font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded-md">
+                ฿3,250
+              </span>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between text-xs mb-1">
+                <label for="num-cc" class="text-slate-600 font-medium">จ่ายหนี้บัตรเครดิต</label>
+                <input id="num-cc" type="number" value="2000" min="0" max="100000" step="100"
+                  class="w-24 px-2 py-0.5 text-right text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg" />
+              </div>
+              <input id="slider-cc" type="range" value="2000" min="0" max="20000" step="100" />
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between text-xs mb-1">
+                <label for="num-korsor" class="text-slate-600 font-medium">จ่ายสำรอง กยศ.</label>
+                <input id="num-korsor" type="number" value="1250" min="0" max="100000" step="50"
+                  class="w-24 px-2 py-0.5 text-right text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg" />
+              </div>
+              <input id="slider-korsor" type="range" value="1250" min="0" max="8000" step="50" />
+            </div>
+          </div>
+
+          <!-- ส่วนจัดสรรเงินเหลือสุทธิ (บอลลูน / DCA / สำรองฉุกเฉิน) -->
+          <div class="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-xs font-bold text-emerald-950">สรุปรายจ่ายรวมและเงินเหลือสุทธิ</div>
+                <div class="text-[11px] text-emerald-800">
+                  รายจ่ายรวม: <strong id="form-total-exp">฿23,300</strong>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-[11px] text-emerald-800 font-medium">เงินเหลือสุทธิ</div>
+                <div id="form-net-surplus" class="text-base font-bold text-emerald-700">฿15,700</div>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-emerald-200/80 space-y-2.5">
+              <div>
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <label for="num-balloon" class="text-slate-700 font-semibold">กองทุนปิดบอลลูน (เป้า 278,700)</label>
+                  <input id="num-balloon" type="number" value="4700" min="0" max="200000" step="100"
+                    class="w-24 px-2 py-0.5 text-right text-xs font-bold text-blue-800 bg-white border border-emerald-200 rounded-lg" />
+                </div>
+                <input id="slider-balloon" type="range" value="4700" min="0" max="20000" step="100" />
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <label for="num-dca" class="text-slate-700 font-semibold">ลงทุนแบบ DCA</label>
+                  <input id="num-dca" type="number" value="6500" min="0" max="200000" step="100"
+                    class="w-24 px-2 py-0.5 text-right text-xs font-bold text-emerald-800 bg-white border border-emerald-200 rounded-lg" />
+                </div>
+                <input id="slider-dca" type="range" value="6500" min="0" max="20000" step="100" />
+              </div>
+
+              <div class="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-emerald-200 text-xs">
+                <span class="text-slate-700 font-semibold">เงินสำรองฉุกเฉิน & สภาพคล่อง</span>
+                <span id="form-emergency" class="font-bold text-emerald-700">฿4,500</span>
+              </div>
+
+              <p id="allocation-warning" class="hidden text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                ยอดจัดสรรบอลลูน + DCA เกินเงินเหลือสุทธิ! เงินสำรองฉุกเฉินติดลบ — คุณยังกดบันทึกได้ หรือปรับลดยอดบอลลูน/DCA ให้สมดุลก่อนได้ครับ
+              </p>
+            </div>
+          </div>
+
+          <!-- ปุ่มกดบันทึก (Submit) -->
+          <button id="btn-submit" type="submit"
+            class="w-full py-3.5 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-sm sm:text-base shadow-md transition cursor-pointer">
+            กดบันทึกข้อมูลรอบนี้ (Submit)
+          </button>
+        </form>
+      </div>
+
+      <!-- คอลัมน์ขวา: กราฟวงกลมสัดส่วนรายจ่าย + กราฟเปรียบเทียบรายเดือน / 1–8 ปี -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- กราฟที่ 1: กราฟวงกลมสัดส่วน 4 หมวด + เงินเหลือ -->
+        <div class="bg-white rounded-2xl p-5 shadow-xs border border-slate-200">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <div>
+              <h2 class="text-base sm:text-lg font-bold text-slate-900">
+                สัดส่วนรายจ่าย 4 หมวด และเงินเหลือสุทธิ (แสดงผลสด)
+              </h2>
+              <p class="text-xs text-slate-500">
+                ขยับแถบเลื่อนหรือกรอกตัวเลขด้านซ้ายเพื่อดูสัดส่วนทันทีก่อนกดบันทึก
+              </p>
+            </div>
+            <span id="donut-surplus-pill" class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 self-start sm:self-auto">
+              เงินเหลือ 40.3% ของรายรับ
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+            <div class="md:col-span-6 h-64 w-full">
+              <canvas id="donut-canvas"></canvas>
+            </div>
+            <div id="donut-legend" class="md:col-span-6 space-y-2 text-xs">
+              <!-- แสดงคำอธิบายสัดส่วนอัตโนมัติด้วย JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- กราฟที่ 2: กราฟเปรียบเทียบรายเดือน / เส้นทาง 1–8 ปี -->
+        <div class="bg-white rounded-2xl p-5 shadow-xs border border-slate-200">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div>
+              <h2 id="line-chart-title" class="text-base sm:text-lg font-bold text-slate-900">
+                เปรียบเทียบประวัติรายรับ-รายจ่าย และสะสมบอลลูน/DCA รายเดือน
+              </h2>
+              <p id="line-chart-subtitle" class="text-xs text-slate-500">
+                อัปเดตทันทีเมื่อกดปุ่ม Submit บันทึกข้อมูลหรือลบรายการ
+              </p>
+            </div>
+
+            <div class="inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200 self-start shrink-0">
+              <button id="tab-view-monthly" type="button"
+                class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-700 shadow-xs transition cursor-pointer">
+                รายเดือน (ตามที่บันทึก)
+              </button>
+              <button id="tab-view-yearly" type="button"
+                class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition cursor-pointer">
+                เส้นทาง 1–8 ปี
+              </button>
+            </div>
+          </div>
+
+          <!-- ตัวเลือกเสริมเมื่อสลับเป็นมุมมอง 1–8 ปี -->
+          <div id="yearly-mode-bar" class="hidden mb-3 p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-2">
+              <label for="select-proj-source" class="font-bold text-slate-700">ฐานคำนวณ 1–8 ปี:</label>
+              <select id="select-proj-source"
+                class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-semibold text-slate-800 outline-none cursor-pointer">
+                <option value="recorded_avg">ค่าเฉลี่ยจากรายการที่บันทึกแล้ว</option>
+                <option value="current_form">ค่าที่กำลังปรับอยู่ในฟอร์มตอนนี้</option>
+              </select>
+            </div>
+            <span class="text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+              DCA ประมาณการผลตอบแทนทบต้น ~7%/ปี
+            </span>
+          </div>
+
+          <div class="h-72 w-full">
+            <canvas id="line-canvas"></canvas>
+          </div>
+
+          <div id="line-chart-legend" class="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-slate-600">
+            <!-- แสดงสัญลักษณ์เส้นกราฟ -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ตารางบันทึกข้อมูลสะสมรายเดือน -->
+    <section class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-slate-900">
+            ตารางบันทึกข้อมูลจริงและยอดสะสมต่อเนื่อง
+          </h2>
+          <p class="text-xs text-slate-500">
+            บันทึกข้อมูลในเบราว์เซอร์อัตโนมัติ พร้อมคำนวณยอดสะสมกองทุนบอลลูน เงินต้น DCA เงินสำรอง และส่วนต่างเทียบงวดก่อน
+          </p>
+        </div>
+        <span id="ledger-count-pill" class="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-full self-start sm:self-auto">
+          1 รายการ
+        </span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <th class="py-3 px-4">วันที่ / งวด</th>
+              <th class="py-3 px-4 text-right">รายรับ</th>
+              <th class="py-3 px-4 text-right">รายจ่าย & สำรอง</th>
+              <th class="py-3 px-4 text-right">เงินเหลือสุทธิ</th>
+              <th class="py-3 px-4 text-right">เทียบงวดก่อน</th>
+              <th class="py-3 px-4 text-right text-blue-700">บอลลูน (สะสม)</th>
+              <th class="py-3 px-4 text-right text-emerald-700">DCA (สะสม)</th>
+              <th class="py-3 px-4 text-right text-purple-700">ฉุกเฉิน / กยศ. สะสม</th>
+              <th class="py-3 px-4 text-center">ลบ</th>
+            </tr>
+          </thead>
+          <tbody id="ledger-tbody" class="divide-y divide-slate-100 text-xs sm:text-sm">
+            <!-- สร้างแถวข้อมูลด้วย JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      // =========================================================================
+      // 1. ค่าคงที่และข้อมูลเริ่มต้น
+      // =========================================================================
+      const STORAGE_KEY = "yaris_cross_finance_v1";
+      const LEGACY_STORAGE_KEY = "yaris_cross_tracker_pure_canvas_v1";
+      const BALLOON_TARGET = 278700;
+      const INITIAL_DATE_ISO = "2026-12-10";
+      const THAI_SHORT_MONTHS = [
+        "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+        "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
+      ];
+
+      const DEFAULT_FORM_VALUES = {
+        isoDate: INITIAL_DATE_ISO,
+        income: 39000,
+        carInstallment: 8300,
+        carReserve: 2250,
+        fuel: 2250,
+        rent: 4250,
+        food: 1500,
+        general: 1500,
+        ccDebt: 2000,
+        korsorReserve: 1250,
+        allocBalloon: 4700,
+        allocDca: 6500
+      };
+
+      const INITIAL_RECORDS = [
+        {
+          id: "seed-2026-12-10",
+          isoDate: "2026-12-10",
+          dateLabel: "10 ธ.ค. 2569",
+          income: 39000,
+          carInstallment: 8300,
+          carReserve: 2250,
+          fuel: 2250,
+          rent: 4250,
+          food: 1500,
+          general: 1500,
+          ccDebt: 2000,
+          korsorReserve: 1250,
+          totalExpense: 23300,
+          netSurplus: 15700,
+          allocBalloon: 4700,
+          allocDca: 6500,
+          allocEmergency: 4500
+        }
+      ];
+
+      // คู่การเชื่อมโยงระหว่างแถบเลื่อน (slider) และช่องกรอกตัวเลข (num)
+      const FIELD_PAIRS = [
+        { key: "income", num: "num-income", slider: "slider-income", fallback: 39000 },
+        { key: "carInstallment", num: "num-car-installment", slider: "slider-car-installment", fallback: 8300 },
+        { key: "carReserve", num: "num-car-reserve", slider: "slider-car-reserve", fallback: 2250 },
+        { key: "fuel", num: "num-fuel", slider: "slider-fuel", fallback: 2250 },
+        { key: "rent", num: "num-rent", slider: "slider-rent", fallback: 4250 },
+        { key: "food", num: "num-food", slider: "slider-food", fallback: 1500 },
+        { key: "general", num: "num-general", slider: "slider-general", fallback: 1500 },
+        { key: "ccDebt", num: "num-cc", slider: "slider-cc", fallback: 2000 },
+        { key: "korsorReserve", num: "num-korsor", slider: "slider-korsor", fallback: 1250 },
+        { key: "allocBalloon", num: "num-balloon", slider: "slider-balloon", fallback: 4700 },
+        { key: "allocDca", num: "num-dca", slider: "slider-dca", fallback: 6500 }
+      ];
+
+      let records = [];
+      let activeTrendTab = "monthly"; // "monthly" | "yearly"
+      let bannerTimer = null;
+
+      // =========================================================================
+      // 2. ฟังก์ชันช่วยจัดรูปแบบตัวเลข วันที่ภาษาไทย และสถานะที่เก็บข้อมูล
+      // =========================================================================
+      function updateStorageIndicator(statusText, isWarning) {
+        const badge = document.getElementById("storage-status-badge");
+        if (!badge) return;
+        const dotColor = isWarning ? "bg-amber-400" : "bg-emerald-400";
+        badge.className = isWarning
+          ? "px-3 py-1.5 rounded-xl bg-amber-950/90 text-amber-200 border border-amber-700/70 text-[11px] sm:text-xs font-semibold flex items-center gap-1.5"
+          : "px-3 py-1.5 rounded-xl bg-emerald-950/90 text-emerald-300 border border-emerald-700/70 text-[11px] sm:text-xs font-semibold flex items-center gap-1.5";
+        badge.innerHTML = `<span class="w-2 h-2 rounded-full ${dotColor} inline-block"></span><span>${statusText}</span>`;
+      }
+
+      function formatBaht(val) {
+        const num = Number(val);
+        if (!Number.isFinite(num)) return "฿0";
+        const sign = num < 0 ? "-" : "";
+        return sign + "฿" + Math.round(Math.abs(num)).toLocaleString("en-US");
+      }
+
+      function formatSignedBaht(val) {
+        const num = Number(val);
+        if (!Number.isFinite(num)) return "฿0";
+        const rounded = Math.round(num);
+        if (rounded > 0) return "+฿" + rounded.toLocaleString("en-US");
+        if (rounded < 0) return "-฿" + Math.abs(rounded).toLocaleString("en-US");
+        return "฿0";
+      }
+
+      function formatThaiDate(isoStr) {
+        if (!isoStr || typeof isoStr !== "string") return "10 ธ.ค. 2569";
+        const parts = isoStr.split("-");
+        if (parts.length !== 3) return isoStr;
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d) || m < 0 || m > 11) {
+          return isoStr;
+        }
+        const buddhistYear = y < 2400 ? y + 543 : y;
+        return `${d} ${THAI_SHORT_MONTHS[m]} ${buddhistYear}`;
+      }
+
+      function showStatusBanner(message, type) {
+        const banner = document.getElementById("status-banner");
+        const textEl = document.getElementById("status-banner-text");
+        if (!banner || !textEl) return;
+
+        banner.classList.remove(
+          "hidden",
+          "bg-emerald-50", "border-emerald-300", "text-emerald-900",
+          "bg-amber-50", "border-amber-300", "text-amber-900",
+          "bg-rose-50", "border-rose-300", "text-rose-900"
+        );
+
+        if (type === "warn") {
+          banner.classList.add("bg-amber-50", "border-amber-300", "text-amber-900");
+        } else if (type === "error") {
+          banner.classList.add("bg-rose-50", "border-rose-300", "text-rose-900");
+        } else {
+          banner.classList.add("bg-emerald-50", "border-emerald-300", "text-emerald-900");
+        }
+
+        textEl.textContent = message;
+
+        if (bannerTimer) {
+          clearTimeout(bannerTimer);
+        }
+        bannerTimer = setTimeout(() => {
+          banner.classList.add("hidden");
+        }, 5000);
+      }
+
+      // =========================================================================
+      // 3. การจัดการข้อมูลบันทึกและสถานะฟอร์มแบบถาวร (localStorage: yaris_cross_finance_v1)
+      // =========================================================================
+      function buildPersistedPayload() {
+        const snap = getFormSnapshot();
+        return {
+          version: 1,
+          updatedAt: new Date().toISOString(),
+          activeTrendTab: activeTrendTab,
+          formState: {
+            isoDate: snap.isoDate,
+            income: snap.income,
+            carInstallment: snap.carInstallment,
+            carReserve: snap.carReserve,
+            fuel: snap.fuel,
+            rent: snap.rent,
+            food: snap.food,
+            general: snap.general,
+            ccDebt: snap.ccDebt,
+            korsorReserve: snap.korsorReserve,
+            allocBalloon: snap.allocBalloon,
+            allocDca: snap.allocDca
+          },
+          records: records
+        };
+      }
+
+      function applyFormStateToInputs(formState) {
+        if (!formState || typeof formState !== "object") return;
+
+        const dateEl = document.getElementById("input-date");
+        if (dateEl && typeof formState.isoDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(formState.isoDate)) {
+          dateEl.value = formState.isoDate;
+        }
+
+        FIELD_PAIRS.forEach((pair) => {
+          const rawVal = formState[pair.key];
+          const numVal = Number(rawVal);
+          const safeVal = Number.isFinite(numVal) && numVal >= 0 ? numVal : pair.fallback;
+
+          const numEl = document.getElementById(pair.num);
+          const sldEl = document.getElementById(pair.slider);
+
+          if (numEl) numEl.value = String(safeVal);
+          if (sldEl) {
+            const minS = parseFloat(sldEl.min) || 0;
+            const maxS = parseFloat(sldEl.max) || safeVal;
+            sldEl.value = String(Math.min(maxS, Math.max(minS, safeVal)));
+          }
+        });
+
+        updateDateBadge();
+      }
+
+      function saveFullState(customMessage) {
+        try {
+          if (!window.localStorage) {
+            updateStorageIndicator("ไม่สามารถเข้าถึงที่เก็บข้อมูลในเบราว์เซอร์ได้ — กรุณาใช้ปุ่มส่งออก JSON/CSV", true);
+            return;
+          }
+          const payload = buildPersistedPayload();
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+          const timeStr = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+          updateStorageIndicator(
+            customMessage || `บันทึกอัตโนมัติในเบราว์เซอร์นี้แล้ว (${records.length} งวด • อัปเดต ${timeStr}) — อยู่ครบแม้ปิดแล้วเปิดใหม่`,
+            false
+          );
+        } catch (err) {
+          updateStorageIndicator("พื้นที่เก็บข้อมูลเต็มหรือถูกจำกัด — แนะนำให้ส่งออก JSON สำรองไว้", true);
+        }
+      }
+
+      function loadFullState() {
+        try {
+          if (!window.localStorage) {
+            records = INITIAL_RECORDS.map((r) => ({ ...r }));
+            applyFormStateToInputs(DEFAULT_FORM_VALUES);
+            updateStorageIndicator("โหมดชั่วคราว — กดส่งออก JSON/CSV เพื่อเก็บไฟล์สำรอง", true);
+            return;
+          }
+
+          const raw = window.localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object" && Array.isArray(parsed.records)) {
+              // เคารพสถานะที่ผู้ใช้เคยบันทึกหรือลบไว้ แม้จะเป็นอาร์เรย์ว่าง []
+              records = parsed.records;
+              if (parsed.activeTrendTab === "yearly" || parsed.activeTrendTab === "monthly") {
+                activeTrendTab = parsed.activeTrendTab;
+              }
+              if (parsed.formState && typeof parsed.formState === "object") {
+                applyFormStateToInputs(parsed.formState);
+              } else {
+                applyFormStateToInputs(DEFAULT_FORM_VALUES);
+              }
+              updateStorageIndicator(
+                `บันทึกอัตโนมัติในเบราว์เซอร์นี้แล้ว (${records.length} งวด) — ข้อมูลอยู่ครบแม้ปิดแล้วเปิดใหม่`,
+                false
+              );
+              return;
+            }
+          }
+
+          // รองรับข้อมูลเวอร์ชันเก่าหากมีอยู่ก่อนหน้า
+          const legacyRaw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+          if (legacyRaw) {
+            const legacyParsed = JSON.parse(legacyRaw);
+            if (Array.isArray(legacyParsed)) {
+              records = legacyParsed;
+              applyFormStateToInputs(DEFAULT_FORM_VALUES);
+              saveFullState(`ย้ายข้อมูลเดิมสำเร็จ (${records.length} งวด) — บันทึกอัตโนมัติพร้อมใช้งาน`);
+              return;
+            }
+          }
+
+          // เยี่ยมชมครั้งแรกและยังไม่เคยบันทึก: ตั้งต้นข้อมูล baseline 10 ธ.ค. 2569
+          records = INITIAL_RECORDS.map((r) => ({ ...r }));
+          applyFormStateToInputs(DEFAULT_FORM_VALUES);
+          saveFullState("ตั้งต้นข้อมูลเริ่มต้น (10 ธ.ค. 2569) และบันทึกอัตโนมัติแล้ว");
+        } catch (err) {
+          records = INITIAL_RECORDS.map((r) => ({ ...r }));
+          applyFormStateToInputs(DEFAULT_FORM_VALUES);
+          updateStorageIndicator("ตรวจพบข้อมูลเดิมเสียหาย — กู้คืนค่าเริ่มต้นให้อัตโนมัติแล้ว", true);
+        }
+      }
+
+      // คงชื่อฟังก์ชัน saveRecords() ไว้เพื่อความเข้ากันได้ภายในโค้ด
+      function saveRecords() {
+        saveFullState();
+      }
+
+      // =========================================================================
+      // 4. การอ่านค่าจากฟอร์มและซิงค์แถบเลื่อนกับช่องตัวเลข
+      // =========================================================================
+      function readNum(id, fallback) {
+        const el = document.getElementById(id);
+        if (!el) return fallback;
+        const v = parseFloat(el.value);
+        return Number.isFinite(v) && v >= 0 ? v : fallback;
+      }
+
+      function getFormSnapshot() {
+        const dateEl = document.getElementById("input-date");
+        const isoDate = (dateEl && dateEl.value) ? dateEl.value : INITIAL_DATE_ISO;
+        const dateLabel = formatThaiDate(isoDate);
+
+        const income = readNum("num-income", 39000);
+        const carInstallment = readNum("num-car-installment", 8300);
+        const carReserve = readNum("num-car-reserve", 2250);
+        const fuel = readNum("num-fuel", 2250);
+        const rent = readNum("num-rent", 4250);
+        const food = readNum("num-food", 1500);
+        const general = readNum("num-general", 1500);
+        const ccDebt = readNum("num-cc", 2000);
+        const korsorReserve = readNum("num-korsor", 1250);
+
+        const cat1 = carInstallment + carReserve;
+        const cat2 = fuel;
+        const cat3 = rent + food + general;
+        const cat4 = ccDebt + korsorReserve;
+        const totalExpense = cat1 + cat2 + cat3 + cat4;
+        const netSurplus = income - totalExpense;
+
+        const allocBalloon = readNum("num-balloon", 4700);
+        const allocDca = readNum("num-dca", 6500);
+        const allocEmergency = netSurplus - (allocBalloon + allocDca);
+
+        return {
+          isoDate,
+          dateLabel,
+          income,
+          carInstallment,
+          carReserve,
+          fuel,
+          rent,
+          food,
+          general,
+          ccDebt,
+          korsorReserve,
+          cat1,
+          cat2,
+          cat3,
+          cat4,
+          totalExpense,
+          netSurplus,
+          allocBalloon,
+          allocDca,
+          allocEmergency
+        };
+      }
+
+      function updateDateBadge() {
+        const dateEl = document.getElementById("input-date");
+        const badgeEl = document.getElementById("thai-date-badge");
+        if (dateEl && badgeEl) {
+          badgeEl.textContent = formatThaiDate(dateEl.value);
+        }
+      }
+
+      function setTenthOfMonth(offsetMonths) {
+        const dateEl = document.getElementById("input-date");
+        if (!dateEl) return;
+
+        let baseYear = 2026;
+        let baseMonth = 11; // ธันวาคม (0-indexed = 11)
+
+        if (dateEl.value && /^\d{4}-\d{2}-\d{2}$/.test(dateEl.value)) {
+          const parts = dateEl.value.split("-");
+          baseYear = parseInt(parts[0], 10);
+          baseMonth = parseInt(parts[1], 10) - 1;
+        }
+
+        const targetDate = new Date(baseYear, baseMonth + offsetMonths, 10);
+        const yyyy = String(targetDate.getFullYear());
+        const mm = String(targetDate.getMonth() + 1).padStart(2, "0");
+        const dd = "10";
+        dateEl.value = `${yyyy}-${mm}-${dd}`;
+        updateDateBadge();
+      }
+
+      function syncFormDisplayAndCharts() {
+        updateDateBadge();
+        const snap = getFormSnapshot();
+
+        const setText = (id, txt) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = txt;
+        };
+
+        setText("subtotal-cat1", formatBaht(snap.cat1));
+        setText("subtotal-cat2", formatBaht(snap.cat2));
+        setText("subtotal-cat3", formatBaht(snap.cat3));
+        setText("subtotal-cat4", formatBaht(snap.cat4));
+        setText("form-total-exp", formatBaht(snap.totalExpense));
+        setText("form-net-surplus", formatBaht(snap.netSurplus));
+        setText("form-emergency", formatBaht(snap.allocEmergency));
+
+        const warnEl = document.getElementById("allocation-warning");
+        if (warnEl) {
+          if (snap.allocEmergency < 0) {
+            warnEl.classList.remove("hidden");
+          } else {
+            warnEl.classList.add("hidden");
+          }
+        }
+
+        const surplusPct = snap.income > 0 ? ((snap.netSurplus / snap.income) * 100).toFixed(1) : "0.0";
+        setText("donut-surplus-pill", `เงินเหลือ ${surplusPct}% ของรายรับ`);
+
+        drawDonutChart(snap);
+        renderDonutLegend(snap);
+
+        if (activeTrendTab === "yearly") {
+          const srcSel = document.getElementById("select-proj-source");
+          if (srcSel && srcSel.value === "current_form") {
+            drawYearlyProjectionChart();
+          }
+        }
+      }
+
+      // =========================================================================
+      // 5. การวาดกราฟวงกลมสัดส่วน 4 หมวด + เงินเหลือด้วย HTML5 Canvas
+      // =========================================================================
+      function drawDonutChart(snap) {
+        const canvas = document.getElementById("donut-canvas");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const width = Math.max(240, Math.floor(rect.width || canvas.parentElement.clientWidth || 300));
+        const height = Math.max(220, Math.floor(rect.height || 256));
+        const dpr = window.devicePixelRatio || 1;
+
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+
+        const slices = [
+          { label: "1. รถ & สำรองประกัน/เช็กระยะ", value: Math.max(0, snap.cat1), color: "#2563eb" },
+          { label: "2. ค่าน้ำมัน", value: Math.max(0, snap.cat2), color: "#0d9488" },
+          { label: "3. ที่พัก ค่ากิน & ทั่วไป", value: Math.max(0, snap.cat3), color: "#f59e0b" },
+          { label: "4. หนี้บัตรเครดิต & สำรอง กยศ.", value: Math.max(0, snap.cat4), color: "#7c3aed" },
+          { label: "เงินเหลือสุทธิ (ออม/DCA/สำรอง)", value: Math.max(0, snap.netSurplus), color: "#10b981" }
+        ];
+
+        const total = slices.reduce((acc, s) => acc + s.value, 0);
+        const cx = width / 2;
+        const cy = height / 2;
+        const outerRadius = Math.min(cx, cy) - 14;
+        const innerRadius = outerRadius * 0.58;
+
+        if (total <= 0) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
+          ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2, true);
+          ctx.fillStyle = "#e2e8f0";
+          ctx.fill();
+          return;
+        }
+
+        let startAngle = -Math.PI / 2;
+        slices.forEach((slice) => {
+          if (slice.value <= 0) return;
+          const sweep = (slice.value / total) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(startAngle) * innerRadius, cy + Math.sin(startAngle) * innerRadius);
+          ctx.arc(cx, cy, outerRadius, startAngle, startAngle + sweep);
+          ctx.arc(cx, cy, innerRadius, startAngle + sweep, startAngle, true);
+          ctx.closePath();
+          ctx.fillStyle = slice.color;
+          ctx.fill();
+
+          // วาดเส้นแบ่งบางๆ ระหว่างชิ้น
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#ffffff";
+          ctx.stroke();
+
+          startAngle += sweep;
+        });
+
+        // ข้อความตรงกลางกราฟวงกลม
+        ctx.fillStyle = "#64748b";
+        ctx.font = "600 11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("รายรับรวม", cx, cy - 11);
+
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "700 15px sans-serif";
+        ctx.fillText(formatBaht(snap.income), cx, cy + 9);
+      }
+
+      function renderDonutLegend(snap) {
+        const legendEl = document.getElementById("donut-legend");
+        if (!legendEl) return;
+
+        const denom = snap.income > 0 ? snap.income : Math.max(1, snap.totalExpense + Math.max(0, snap.netSurplus));
+        const items = [
+          {
+            label: "1. รถ & สำรองประกัน/เช็กระยะ",
+            sub: `งวดรถ ${formatBaht(snap.carInstallment)} + สำรอง ${formatBaht(snap.carReserve)}`,
+            amount: snap.cat1,
+            color: "#2563eb"
+          },
+          {
+            label: "2. ค่าน้ำมัน",
+            sub: "ค่าน้ำมันเชื้อเพลิงรายเดือน",
+            amount: snap.cat2,
+            color: "#0d9488"
+          },
+          {
+            label: "3. ที่พัก ค่ากิน & ทั่วไป",
+            sub: `เช่าบ้าน ${formatBaht(snap.rent)} + กิน ${formatBaht(snap.food)} + ทั่วไป ${formatBaht(snap.general)}`,
+            amount: snap.cat3,
+            color: "#f59e0b"
+          },
+          {
+            label: "4. หนี้บัตรเครดิต & สำรอง กยศ.",
+            sub: `บัตรเครดิต ${formatBaht(snap.ccDebt)} + สำรอง กยศ. ${formatBaht(snap.korsorReserve)}`,
+            amount: snap.cat4,
+            color: "#7c3aed"
+          },
+          {
+            label: "เงินเหลือสุทธิ",
+            sub: `บอลลูน ${formatBaht(snap.allocBalloon)} • DCA ${formatBaht(snap.allocDca)} • สำรอง ${formatBaht(snap.allocEmergency)}`,
+            amount: snap.netSurplus,
+            color: "#10b981"
+          }
+        ];
+
+        legendEl.innerHTML = items.map((it) => {
+          const pct = ((it.amount / denom) * 100).toFixed(1);
+          return `
+            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2">
+              <div class="min-w-0">
+                <div class="font-bold text-slate-800 flex items-center gap-2 truncate">
+                  <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${it.color}"></span>
+                  <span class="truncate">${it.label}</span>
+                </div>
+                <div class="text-[11px] text-slate-500 pl-4.5 truncate">${it.sub}</div>
+              </div>
+              <div class="text-right shrink-0">
+                <div class="font-bold text-slate-900">${formatBaht(it.amount)}</div>
+                <div class="text-[11px] font-semibold text-slate-500">${pct}%</div>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      // =========================================================================
+      // 6. การวาดกราฟเปรียบเทียบรายเดือน และเส้นทาง 1–8 ปี ด้วย HTML5 Canvas
+      // =========================================================================
+      function drawLineSeries(ctx, width, height, labels, datasets, targetValue) {
+        const padLeft = 64;
+        const padRight = 20;
+        const padTop = 20;
+        const padBottom = 42;
+        const plotW = Math.max(60, width - padLeft - padRight);
+        const plotH = Math.max(60, height - padTop - padBottom);
+
+        ctx.clearRect(0, 0, width, height);
+
+        // หาค่าสูงสุดและต่ำสุดสำหรับสเกลแกน Y
+        let minVal = 0;
+        let maxVal = 10000;
+        datasets.forEach((ds) => {
+          ds.data.forEach((v) => {
+            if (Number.isFinite(v)) {
+              if (v < minVal) minVal = v;
+              if (v > maxVal) maxVal = v;
+            }
+          });
+        });
+        if (typeof targetValue === "number" && Number.isFinite(targetValue) && targetValue > maxVal) {
+          maxVal = targetValue * 1.1;
+        }
+        if (minVal === maxVal) {
+          maxVal = minVal + 10000;
+        }
+        const range = Math.max(1, maxVal - minVal);
+
+        const xAt = (idx) => {
+          if (labels.length <= 1) return padLeft + plotW / 2;
+          return padLeft + (idx / (labels.length - 1)) * plotW;
+        };
+
+        const yAt = (val) => {
+          const ratio = (val - minVal) / range;
+          return padTop + plotH - ratio * plotH;
+        };
+
+        // วาดเส้นตารางแนวนอนและป้ายแกน Y
+        const gridSteps = 5;
+        ctx.font = "600 11px sans-serif";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+
+        for (let i = 0; i <= gridSteps; i++) {
+          const val = minVal + (range * i) / gridSteps;
+          const y = yAt(val);
+
+          ctx.beginPath();
+          ctx.moveTo(padLeft, y);
+          ctx.lineTo(padLeft + plotW, y);
+          ctx.strokeStyle = i === 0 ? "#cbd5e1" : "#f1f5f9";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          ctx.fillStyle = "#64748b";
+          const shortLabel = Math.abs(val) >= 1000000
+            ? (val / 1000000).toFixed(1) + "M"
+            : Math.abs(val) >= 1000
+              ? Math.round(val / 1000) + "k"
+              : Math.round(val).toString();
+          ctx.fillText("฿" + shortLabel, padLeft - 8, y);
+        }
+
+        // เส้นอ้างอิงเป้าหมายปิดบอลลูน 278,700 บาท (ถ้ามี)
+        if (typeof targetValue === "number" && targetValue >= minVal && targetValue <= maxVal) {
+          const ty = yAt(targetValue);
+          ctx.save();
+          ctx.setLineDash([6, 4]);
+          ctx.beginPath();
+          ctx.moveTo(padLeft, ty);
+          ctx.lineTo(padLeft + plotW, ty);
+          ctx.strokeStyle = "#e11d48";
+          ctx.lineWidth = 1.75;
+          ctx.stroke();
+          ctx.restore();
+
+          ctx.fillStyle = "#be123c";
+          ctx.font = "700 11px sans-serif";
+          ctx.textAlign = "left";
+          ctx.fillText("เป้าปิดบอลลูน ฿278,700", padLeft + 8, ty - 9);
+        }
+
+        // วาดแต่ละเส้นข้อมูล
+        datasets.forEach((ds) => {
+          if (!Array.isArray(ds.data) || ds.data.length === 0) return;
+
+          ctx.beginPath();
+          ds.data.forEach((val, idx) => {
+            const x = xAt(idx);
+            const y = yAt(val);
+            if (idx === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.strokeStyle = ds.color;
+          ctx.lineWidth = 2.5;
+          ctx.lineJoin = "round";
+          ctx.stroke();
+
+          // วาดจุดข้อมูลบนแต่ละจุด
+          ds.data.forEach((val, idx) => {
+            const x = xAt(idx);
+            const y = yAt(val);
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = ds.color;
+            ctx.fill();
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = "#ffffff";
+            ctx.stroke();
+          });
+        });
+
+        // ป้ายแกน X
+        ctx.fillStyle = "#475569";
+        ctx.font = "600 11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        labels.forEach((lbl, idx) => {
+          const x = xAt(idx);
+          ctx.fillText(lbl, x, padTop + plotH + 10);
+        });
+      }
+
+      function drawMonthlyRecordedChart() {
+        const canvas = document.getElementById("line-canvas");
+        const legendEl = document.getElementById("line-chart-legend");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const width = Math.max(260, Math.floor(rect.width || canvas.parentElement.clientWidth || 500));
+        const height = Math.max(240, Math.floor(rect.height || 288));
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const labels = records.map((r, idx) => `งวด ${idx + 1} (${r.dateLabel})`);
+        const incomeArr = records.map((r) => r.income);
+        const expArr = records.map((r) => r.totalExpense);
+
+        let cumBalloon = 0;
+        let cumDca = 0;
+        const balloonCumArr = records.map((r) => {
+          cumBalloon += Number(r.allocBalloon) || 0;
+          return cumBalloon;
+        });
+        const dcaCumArr = records.map((r) => {
+          cumDca += Number(r.allocDca) || 0;
+          return cumDca;
+        });
+
+        const datasets = [
+          { label: "รายรับงวดนั้น", data: incomeArr, color: "#2563eb" },
+          { label: "รายจ่าย & สำรองงวดนั้น", data: expArr, color: "#f59e0b" },
+          { label: "กองทุนบอลลูนสะสม", data: balloonCumArr, color: "#0ea5e9" },
+          { label: "เงินต้น DCA สะสม", data: dcaCumArr, color: "#10b981" }
+        ];
+
+        drawLineSeries(ctx, width, height, labels, datasets, null);
+
+        if (legendEl) {
+          legendEl.innerHTML = datasets.map((d) => `
+            <span class="inline-flex items-center gap-1.5 font-medium">
+              <span class="w-3 h-3 rounded-full" style="background:${d.color}"></span>
+              ${d.label}
+            </span>
+          `).join("");
+        }
+      }
+
+      function drawYearlyProjectionChart() {
+        const canvas = document.getElementById("line-canvas");
+        const legendEl = document.getElementById("line-chart-legend");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const width = Math.max(260, Math.floor(rect.width || canvas.parentElement.clientWidth || 500));
+        const height = Math.max(240, Math.floor(rect.height || 288));
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const sourceSel = document.getElementById("select-proj-source");
+        const mode = sourceSel ? sourceSel.value : "recorded_avg";
+
+        let monthlySurplus = 15700;
+        let monthlyBalloon = 4700;
+        let monthlyDca = 6500;
+
+        if (mode === "current_form") {
+          const snap = getFormSnapshot();
+          monthlySurplus = Math.max(0, snap.netSurplus);
+          monthlyBalloon = Math.max(0, snap.allocBalloon);
+          monthlyDca = Math.max(0, snap.allocDca);
+        } else if (records.length > 0) {
+          const n = records.length;
+          const sumSurplus = records.reduce((a, b) => a + (Number(b.netSurplus) || 0), 0);
+          const sumBalloon = records.reduce((a, b) => a + (Number(b.allocBalloon) || 0), 0);
+          const sumDca = records.reduce((a, b) => a + (Number(b.allocDca) || 0), 0);
+          monthlySurplus = Math.max(0, sumSurplus / n);
+          monthlyBalloon = Math.max(0, sumBalloon / n);
+          monthlyDca = Math.max(0, sumDca / n);
+        }
+
+        const years = [1, 2, 3, 4, 5, 6, 7, 8];
+        const labels = years.map((y) => `ปีที่ ${y}`);
+
+        const cumSurplusArr = years.map((y) => monthlySurplus * 12 * y);
+        const cumBalloonArr = years.map((y) => monthlyBalloon * 12 * y);
+
+        // คำนวณมูลค่าพอร์ต DCA ทบต้นรายเดือนที่ผลตอบแทนประมาณ 7% ต่อปี
+        const annualRate = 0.07;
+        const monthlyRate = annualRate / 12;
+        const dcaPortfolioArr = years.map((y) => {
+          const months = y * 12;
+          if (monthlyDca <= 0) return 0;
+          return monthlyDca * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate);
+        });
+
+        const datasets = [
+          { label: "เงินเหลือสุทธิสะสม (1–8 ปี)", data: cumSurplusArr, color: "#6366f1" },
+          { label: "กองทุนปิดบอลลูนสะสม", data: cumBalloonArr, color: "#2563eb" },
+          { label: "พอร์ต DCA (~7%/ปี)", data: dcaPortfolioArr, color: "#10b981" }
+        ];
+
+        drawLineSeries(ctx, width, height, labels, datasets, BALLOON_TARGET);
+
+        if (legendEl) {
+          legendEl.innerHTML = `
+            ${datasets.map((d) => `
+              <span class="inline-flex items-center gap-1.5 font-medium">
+                <span class="w-3 h-3 rounded-full" style="background:${d.color}"></span>
+                ${d.label}
+              </span>
+            `).join("")}
+            <span class="inline-flex items-center gap-1.5 font-semibold text-rose-700">
+              <span class="w-3.5 border-t-2 border-dashed border-rose-600 inline-block"></span>
+              เส้นเป้าปิดบอลลูน ฿278,700
+            </span>
+          `;
+        }
+      }
+
+      function renderTrendChart() {
+        const titleEl = document.getElementById("line-chart-title");
+        const subEl = document.getElementById("line-chart-subtitle");
+        const barEl = document.getElementById("yearly-mode-bar");
+
+        if (activeTrendTab === "yearly") {
+          if (titleEl) titleEl.textContent = "เส้นทางสะสมระยะยาว 1–8 ปี (บอลลูน vs พอร์ต DCA vs เงินเหลือ)";
+          if (subEl) subEl.textContent = "เปรียบเทียบยอดสะสมรายปีเทียบกับเส้นเป้าหมายปิดงวดที่ 60 (278,700 บาท)";
+          if (barEl) barEl.classList.remove("hidden");
+          drawYearlyProjectionChart();
+        } else {
+          if (titleEl) titleEl.textContent = "เปรียบเทียบประวัติรายรับ-รายจ่าย และสะสมบอลลูน/DCA รายเดือน";
+          if (subEl) subEl.textContent = "แสดงเฉพาะงวดที่บันทึกจริงในตารางด้านล่าง";
+          if (barEl) barEl.classList.add("hidden");
+          drawMonthlyRecordedChart();
+        }
+      }
+
+      function switchTrendTab(tabName) {
+        activeTrendTab = tabName === "yearly" ? "yearly" : "monthly";
+        const btnM = document.getElementById("tab-view-monthly");
+        const btnY = document.getElementById("tab-view-yearly");
+
+        if (btnM && btnY) {
+          if (activeTrendTab === "yearly") {
+            btnY.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-700 shadow-xs transition cursor-pointer";
+            btnM.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition cursor-pointer";
+          } else {
+            btnM.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-700 shadow-xs transition cursor-pointer";
+            btnY.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition cursor-pointer";
+          }
+        }
+        renderTrendChart();
+        saveFullState();
+      }
+
+      // =========================================================================
+      // 7. การอัปเดตการ์ด KPI และตารางประวัติบันทึก
+      // =========================================================================
+      function renderKPIsAndLedger() {
+        const tbody = document.getElementById("ledger-tbody");
+        const countBadge = document.getElementById("kpi-record-badge");
+        const pillBadge = document.getElementById("ledger-count-pill");
+
+        const totalCount = records.length;
+        if (countBadge) countBadge.textContent = `${totalCount} รอบบันทึก`;
+        if (pillBadge) pillBadge.textContent = `${totalCount} รายการ`;
+
+        if (totalCount === 0) {
+          const setKpi = (id, v) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = v;
+          };
+          setKpi("kpi-balloon-total", "฿0");
+          setKpi("kpi-balloon-pct", "0.00%");
+          setKpi("kpi-balloon-rem", "เหลืออีก ฿278,700");
+          setKpi("kpi-dca-total", "฿0");
+          setKpi("kpi-dca-sub", "เฉลี่ยต่องวด: ฿0");
+          setKpi("kpi-emergency-total", "฿0");
+          setKpi("kpi-korsor-total", "฿0");
+          setKpi("kpi-latest-surplus", "฿0");
+          setKpi("kpi-latest-date", "-");
+
+          const bar = document.getElementById("kpi-balloon-bar");
+          if (bar) bar.style.width = "0%";
+
+          const diffBadge = document.getElementById("kpi-diff-badge");
+          if (diffBadge) {
+            diffBadge.textContent = "ไม่มีข้อมูล";
+            diffBadge.className = "font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600";
+          }
+
+          if (tbody) {
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="9" class="py-8 px-4 text-center text-slate-500">
+                  ยังไม่มีรายการบันทึก — กรอกตัวเลขด้านซ้ายแล้วกด "กดบันทึกข้อมูลรอบนี้ (Submit)"
+                </td>
+              </tr>
+            `;
+          }
+          return;
+        }
+
+        let cumBalloon = 0;
+        let cumDca = 0;
+        let cumEmergency = 0;
+        let cumKorsor = 0;
+        const rowsHtml = [];
+
+        records.forEach((rec, idx) => {
+          const b = Number(rec.allocBalloon) || 0;
+          const d = Number(rec.allocDca) || 0;
+          const e = Number(rec.allocEmergency) || 0;
+          const k = Number(rec.korsorReserve) || 0;
+
+          cumBalloon += b;
+          cumDca += d;
+          cumEmergency += e;
+          cumKorsor += k;
+
+          const prev = idx > 0 ? records[idx - 1] : null;
+          const diffSurplus = prev ? (Number(rec.netSurplus) || 0) - (Number(prev.netSurplus) || 0) : null;
+
+          let diffCellHtml = `<span class="text-xs text-slate-400 font-medium">งวดแรก</span>`;
+          if (diffSurplus !== null) {
+            if (diffSurplus > 0) {
+              diffCellHtml = `<span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">${formatSignedBaht(diffSurplus)}</span>`;
+            } else if (diffSurplus < 0) {
+              diffCellHtml = `<span class="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md">${formatSignedBaht(diffSurplus)}</span>`;
+            } else {
+              diffCellHtml = `<span class="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">฿0</span>`;
+            }
+          }
+
+          rowsHtml.push(`
+            <tr class="hover:bg-slate-50/80 transition">
+              <td class="py-3 px-4 whitespace-nowrap">
+                <div class="font-bold text-slate-900">${rec.dateLabel || formatThaiDate(rec.isoDate)}</div>
+                <div class="text-[11px] text-slate-400">งวดที่ ${idx + 1}</div>
+              </td>
+              <td class="py-3 px-4 text-right font-semibold text-slate-800 whitespace-nowrap">${formatBaht(rec.income)}</td>
+              <td class="py-3 px-4 text-right text-slate-700 whitespace-nowrap">${formatBaht(rec.totalExpense)}</td>
+              <td class="py-3 px-4 text-right font-bold ${(Number(rec.netSurplus) || 0) >= 0 ? "text-emerald-700" : "text-rose-700"} whitespace-nowrap">
+                ${formatBaht(rec.netSurplus)}
+              </td>
+              <td class="py-3 px-4 text-right whitespace-nowrap">${diffCellHtml}</td>
+              <td class="py-3 px-4 text-right whitespace-nowrap">
+                <div class="font-bold text-blue-700">${formatBaht(cumBalloon)}</div>
+                <div class="text-[11px] text-blue-500">+${formatBaht(b)} งวดนี้</div>
+              </td>
+              <td class="py-3 px-4 text-right whitespace-nowrap">
+                <div class="font-bold text-emerald-700">${formatBaht(cumDca)}</div>
+                <div class="text-[11px] text-emerald-600">+${formatBaht(d)} งวดนี้</div>
+              </td>
+              <td class="py-3 px-4 text-right whitespace-nowrap">
+                <div class="font-bold text-purple-700">ฉุกเฉิน ${formatBaht(cumEmergency)}</div>
+                <div class="text-[11px] text-purple-600">กยศ.สะสม ${formatBaht(cumKorsor)}</div>
+              </td>
+              <td class="py-3 px-4 text-center whitespace-nowrap">
+                <button type="button" data-delete-id="${rec.id}"
+                  class="btn-delete-row px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer">
+                  ลบ
+                </button>
+              </td>
+            </tr>
+          `);
+        });
+
+        if (tbody) {
+          tbody.innerHTML = rowsHtml.join("");
+        }
+
+        // อัปเดตการ์ด KPI จากยอดสะสมล่าสุด
+        const latest = records[records.length - 1];
+        const prev = records.length > 1 ? records[records.length - 2] : null;
+
+        const pct = Math.min(100, (cumBalloon / BALLOON_TARGET) * 100);
+        const remainingBalloon = Math.max(0, BALLOON_TARGET - cumBalloon);
+
+        const setElText = (id, txt) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = txt;
+        };
+
+        setElText("kpi-balloon-total", formatBaht(cumBalloon));
+        setElText("kpi-balloon-pct", pct.toFixed(2) + "%");
+        setElText("kpi-balloon-rem", `เหลืออีก ${formatBaht(remainingBalloon)}`);
+
+        const barEl = document.getElementById("kpi-balloon-bar");
+        if (barEl) barEl.style.width = pct.toFixed(2) + "%";
+
+        setElText("kpi-dca-total", formatBaht(cumDca));
+        setElText("kpi-dca-sub", `เฉลี่ยต่องวด: ${formatBaht(cumDca / totalCount)}`);
+
+        setElText("kpi-emergency-total", formatBaht(cumEmergency));
+        setElText("kpi-korsor-total", formatBaht(cumKorsor));
+
+        setElText("kpi-latest-surplus", formatBaht(latest.netSurplus));
+        setElText("kpi-latest-date", latest.dateLabel || formatThaiDate(latest.isoDate));
+
+        const diffBadge = document.getElementById("kpi-diff-badge");
+        if (diffBadge) {
+          if (!prev) {
+            diffBadge.textContent = "งวดตั้งต้น";
+            diffBadge.className = "font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700";
+          } else {
+            const delta = (Number(latest.netSurplus) || 0) - (Number(prev.netSurplus) || 0);
+            diffBadge.textContent = formatSignedBaht(delta);
+            if (delta > 0) {
+              diffBadge.className = "font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700";
+            } else if (delta < 0) {
+              diffBadge.className = "font-bold px-2 py-0.5 rounded-md bg-rose-50 text-rose-700";
+            } else {
+              diffBadge.className = "font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700";
+            }
+          }
+        }
+      }
+
+      // =========================================================================
+      // 8. การกดบันทึก (Submit), การลบรายการ, การรีเซ็ต และการส่งออก CSV
+      // =========================================================================
+      function handleFormSubmit(event) {
+        if (event) event.preventDefault();
+
+        const snap = getFormSnapshot();
+        const newEntry = {
+          id: "rec-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+          isoDate: snap.isoDate,
+          dateLabel: snap.dateLabel,
+          income: snap.income,
+          carInstallment: snap.carInstallment,
+          carReserve: snap.carReserve,
+          fuel: snap.fuel,
+          rent: snap.rent,
+          food: snap.food,
+          general: snap.general,
+          ccDebt: snap.ccDebt,
+          korsorReserve: snap.korsorReserve,
+          totalExpense: snap.totalExpense,
+          netSurplus: snap.netSurplus,
+          allocBalloon: snap.allocBalloon,
+          allocDca: snap.allocDca,
+          allocEmergency: snap.allocEmergency
+        };
+
+        records.push(newEntry);
+        saveRecords();
+
+        // เลื่อนปฏิทินไปวันที่ 10 ของเดือนถัดไปโดยอัตโนมัติ
+        setTenthOfMonth(1);
+
+        renderKPIsAndLedger();
+        renderTrendChart();
+        saveFullState(`บันทึกรอบ "${newEntry.dateLabel}" แล้ว (${records.length} งวด) — ข้อมูลอยู่ครบแม้ปิดแล้วเปิดใหม่`);
+
+        if (snap.allocEmergency < 0) {
+          showStatusBanner(
+            `บันทึกข้อมูล "${newEntry.dateLabel}" เรียบร้อยแล้ว (หมายเหตุ: ยอดจัดสรรเกินเงินเหลือสุทธิ สำรองฉุกเฉิน ${formatBaht(snap.allocEmergency)})`,
+            "warn"
+          );
+        } else {
+          showStatusBanner(
+            `บันทึกข้อมูล "${newEntry.dateLabel}" เรียบร้อยแล้ว! รายรับ ${formatBaht(newEntry.income)} • เหลือสุทธิ ${formatBaht(newEntry.netSurplus)}`,
+            "success"
+          );
+        }
+      }
+
+      function handleDeleteRow(id) {
+        records = records.filter((r) => r.id !== id);
+        renderKPIsAndLedger();
+        renderTrendChart();
+        saveFullState(`ลบรายการแล้ว (เหลือ ${records.length} งวด) — บันทึกสถานะล่าสุดอัตโนมัติแล้ว`);
+        showStatusBanner("ลบรายการที่เลือกเรียบร้อยแล้ว", "warn");
+      }
+
+      function openResetConfirmBar() {
+        const bar = document.getElementById("reset-confirm-bar");
+        if (bar) bar.classList.remove("hidden");
+      }
+
+      function closeResetConfirmBar() {
+        const bar = document.getElementById("reset-confirm-bar");
+        if (bar) bar.classList.add("hidden");
+      }
+
+      function handleResetAll() {
+        closeResetConfirmBar();
+        records = INITIAL_RECORDS.map((r) => ({ ...r }));
+        activeTrendTab = "monthly";
+        applyFormStateToInputs(DEFAULT_FORM_VALUES);
+        switchTrendTab("monthly");
+        syncFormDisplayAndCharts();
+        renderKPIsAndLedger();
+        renderTrendChart();
+        saveFullState("รีเซ็ตกลับค่าเริ่มต้น (10 ธ.ค. 2569) และบันทึกอัตโนมัติแล้ว");
+        showStatusBanner("รีเซ็ตข้อมูลกลับสู่ค่าเริ่มต้น (10 ธ.ค. 2569) เรียบร้อยแล้ว", "success");
+      }
+
+      function handleExportJson() {
+        try {
+          const payload = buildPersistedPayload();
+          const jsonText = JSON.stringify(payload, null, 2);
+          const blob = new Blob([jsonText], { type: "application/json;charset=utf-8;" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          const todayIso = new Date().toISOString().slice(0, 10);
+          a.href = url;
+          a.download = `yaris-cross-finance-backup-${todayIso}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showStatusBanner("ส่งออกไฟล์สำรอง JSON เรียบร้อยแล้ว สามารถนำไปกู้คืนหรือย้ายเครื่องได้ครับ", "success");
+        } catch (err) {
+          showStatusBanner("ไม่สามารถส่งออกไฟล์ JSON ได้ในขณะนี้", "error");
+        }
+      }
+
+      function handleImportJsonFile(event) {
+        const inputEl = event && event.target ? event.target : null;
+        const file = inputEl && inputEl.files && inputEl.files[0] ? inputEl.files[0] : null;
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          try {
+            const rawText = e && e.target ? String(e.target.result || "") : "";
+            const parsed = JSON.parse(rawText);
+
+            let importedRecords = null;
+            let importedForm = null;
+            let importedTab = null;
+
+            if (Array.isArray(parsed)) {
+              importedRecords = parsed;
+            } else if (parsed && typeof parsed === "object" && Array.isArray(parsed.records)) {
+              importedRecords = parsed.records;
+              importedForm = parsed.formState || null;
+              importedTab = parsed.activeTrendTab || null;
+            }
+
+            if (!Array.isArray(importedRecords)) {
+              showStatusBanner("ไฟล์ JSON ไม่ตรงกับโครงสร้างข้อมูลของระบบบันทึกการเงิน", "error");
+              return;
+            }
+
+            records = importedRecords;
+            if (importedForm && typeof importedForm === "object") {
+              applyFormStateToInputs(importedForm);
+            }
+            if (importedTab === "yearly" || importedTab === "monthly") {
+              activeTrendTab = importedTab;
+            }
+
+            const btnM = document.getElementById("tab-view-monthly");
+            const btnY = document.getElementById("tab-view-yearly");
+            if (btnM && btnY) {
+              if (activeTrendTab === "yearly") {
+                btnY.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-700 shadow-xs transition cursor-pointer";
+                btnM.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition cursor-pointer";
+              } else {
+                btnM.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-700 shadow-xs transition cursor-pointer";
+                btnY.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition cursor-pointer";
+              }
+            }
+
+            syncFormDisplayAndCharts();
+            renderKPIsAndLedger();
+            renderTrendChart();
+            saveFullState(`กู้คืนข้อมูลจาก JSON สำเร็จ (${records.length} งวด) — บันทึกอัตโนมัติแล้ว`);
+            showStatusBanner(`นำเข้าและกู้คืนข้อมูลจากไฟล์ "${file.name}" เรียบร้อยแล้ว (${records.length} งวด)`, "success");
+          } catch (err) {
+            showStatusBanner("ไม่สามารถอ่านไฟล์ JSON ได้ กรุณาตรวจสอบรูปแบบไฟล์อีกครั้ง", "error");
+          } finally {
+            if (inputEl) inputEl.value = "";
+          }
+        };
+        reader.onerror = function () {
+          showStatusBanner("เกิดข้อผิดพลาดระหว่างอ่านไฟล์ JSON", "error");
+          if (inputEl) inputEl.value = "";
+        };
+        reader.readAsText(file, "utf-8");
+      }
+
+      function handleExportCsv() {
+        const headers = [
+          "งวดที่",
+          "วันที่",
+          "รายรับ",
+          "ค่างวดรถ",
+          "สำรองประกันและเช็กระยะ",
+          "ค่าน้ำมัน",
+          "ค่าเช่าบ้าน",
+          "ค่ากินอยู่จ่ายเอง",
+          "ค่าใช้จ่ายอื่นๆ ทั่วไป",
+          "จ่ายหนี้บัตรเครดิต",
+          "จ่ายสำรอง กยศ.",
+          "รายจ่ายและสำรองรวม",
+          "เงินเหลือสุทธิ",
+          "กองทุนปิดบอลลูน",
+          "ลงทุน DCA",
+          "เงินสำรองฉุกเฉิน"
+        ];
+
+        const lines = [headers.join(",")];
+        records.forEach((r, i) => {
+          const row = [
+            i + 1,
+            `"${r.dateLabel || r.isoDate}"`,
+            r.income,
+            r.carInstallment,
+            r.carReserve,
+            r.fuel,
+            r.rent,
+            r.food,
+            r.general,
+            r.ccDebt,
+            r.korsorReserve,
+            r.totalExpense,
+            r.netSurplus,
+            r.allocBalloon,
+            r.allocDca,
+            r.allocEmergency
+          ];
+          lines.push(row.join(","));
+        });
+
+        const csvContent = "\uFEFF" + lines.join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "yaris-cross-finance-ledger.csv";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showStatusBanner("ส่งออกไฟล์ CSV เรียบร้อยแล้ว", "success");
+      }
+
+      // =========================================================================
+      // 9. ผูก Event Listeners ภายใน DOMContentLoaded อย่างปลอดภัย
+      // =========================================================================
+      document.addEventListener("DOMContentLoaded", function () {
+        loadFullState();
+
+        // ผูกคู่ Slider <-> Number input และบันทึกสถานะสไลเดอร์อัตโนมัติ
+        FIELD_PAIRS.forEach((pair) => {
+          const numEl = document.getElementById(pair.num);
+          const sldEl = document.getElementById(pair.slider);
+
+          if (numEl && sldEl) {
+            numEl.addEventListener("input", function () {
+              const val = parseFloat(numEl.value);
+              if (Number.isFinite(val)) {
+                const minS = parseFloat(sldEl.min) || 0;
+                const maxS = parseFloat(sldEl.max) || val;
+                sldEl.value = String(Math.min(maxS, Math.max(minS, val)));
+              }
+              syncFormDisplayAndCharts();
+              saveFullState();
+            });
+
+            sldEl.addEventListener("input", function () {
+              numEl.value = sldEl.value;
+              syncFormDisplayAndCharts();
+              saveFullState();
+            });
+          }
+        });
+
+        const dateEl = document.getElementById("input-date");
+        if (dateEl) {
+          dateEl.addEventListener("change", function () {
+            updateDateBadge();
+            saveFullState();
+          });
+          dateEl.addEventListener("input", function () {
+            updateDateBadge();
+            saveFullState();
+          });
+        }
+
+        const btnCurrent10 = document.getElementById("btn-date-current-10");
+        if (btnCurrent10) {
+          btnCurrent10.addEventListener("click", function () {
+            setTenthOfMonth(0);
+            saveFullState();
+          });
+        }
+
+        const btnNext10 = document.getElementById("btn-date-next-10");
+        if (btnNext10) {
+          btnNext10.addEventListener("click", function () {
+            setTenthOfMonth(1);
+            saveFullState();
+          });
+        }
+
+        const btnInit10 = document.getElementById("btn-date-init-10");
+        if (btnInit10) {
+          btnInit10.addEventListener("click", function () {
+            if (dateEl) {
+              dateEl.value = INITIAL_DATE_ISO;
+              updateDateBadge();
+              saveFullState();
+            }
+          });
+        }
+
+        const formEl = document.getElementById("finance-form");
+        if (formEl) {
+          formEl.addEventListener("submit", handleFormSubmit);
+        }
+
+        const btnCloseBanner = document.getElementById("btn-close-banner");
+        if (btnCloseBanner) {
+          btnCloseBanner.addEventListener("click", function () {
+            const banner = document.getElementById("status-banner");
+            if (banner) banner.classList.add("hidden");
+          });
+        }
+
+        const tabMonthly = document.getElementById("tab-view-monthly");
+        if (tabMonthly) {
+          tabMonthly.addEventListener("click", function () {
+            switchTrendTab("monthly");
+          });
+        }
+
+        const tabYearly = document.getElementById("tab-view-yearly");
+        if (tabYearly) {
+          tabYearly.addEventListener("click", function () {
+            switchTrendTab("yearly");
+          });
+        }
+
+        const projSrc = document.getElementById("select-proj-source");
+        if (projSrc) {
+          projSrc.addEventListener("change", function () {
+            if (activeTrendTab === "yearly") {
+              drawYearlyProjectionChart();
+            }
+          });
+        }
+
+        const tbody = document.getElementById("ledger-tbody");
+        if (tbody) {
+          tbody.addEventListener("click", function (ev) {
+            const target = ev.target.closest(".btn-delete-row");
+            if (target) {
+              const delId = target.getAttribute("data-delete-id");
+              if (delId) handleDeleteRow(delId);
+            }
+          });
+        }
+
+        const btnExportJson = document.getElementById("btn-export-json");
+        if (btnExportJson) {
+          btnExportJson.addEventListener("click", handleExportJson);
+        }
+
+        const btnImportJson = document.getElementById("btn-import-json");
+        const inputImportJson = document.getElementById("input-import-json");
+        if (btnImportJson && inputImportJson) {
+          btnImportJson.addEventListener("click", function () {
+            inputImportJson.click();
+          });
+          inputImportJson.addEventListener("change", handleImportJsonFile);
+        }
+
+        const btnExport = document.getElementById("btn-export-csv");
+        if (btnExport) {
+          btnExport.addEventListener("click", handleExportCsv);
+        }
+
+        const btnReset = document.getElementById("btn-reset-data");
+        if (btnReset) {
+          btnReset.addEventListener("click", openResetConfirmBar);
+        }
+
+        const btnConfirmReset = document.getElementById("btn-confirm-reset");
+        if (btnConfirmReset) {
+          btnConfirmReset.addEventListener("click", handleResetAll);
+        }
+
+        const btnCancelReset = document.getElementById("btn-cancel-reset");
+        if (btnCancelReset) {
+          btnCancelReset.addEventListener("click", closeResetConfirmBar);
+        }
+
+        window.addEventListener("resize", function () {
+          const snap = getFormSnapshot();
+          drawDonutChart(snap);
+          renderTrendChart();
+        });
+
+        // แสดงผลครั้งแรกทันที
+        syncFormDisplayAndCharts();
+        renderKPIsAndLedger();
+        renderTrendChart();
+      });
+    })();
+  </script>
+</body>
+</html>
